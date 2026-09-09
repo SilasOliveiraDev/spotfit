@@ -51,9 +51,13 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
         children: [
           TextField(
             controller: _title,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             decoration: const InputDecoration(
-              labelText: 'Nome',
-              hintText: 'Ex.: Cardio, Muscle, HIIT 20min',
+              labelText: 'Nome da playlist',
+              hintText: 'Ex.: Cardio Manhã',
+              helperText: 'Escreva o nome e depois escolha as faixas',
             ),
           ),
           const SizedBox(height: 16),
