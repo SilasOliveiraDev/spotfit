@@ -40,6 +40,13 @@ class HomeScreen extends StatelessWidget {
                   'Escolha o foco do treino e aperta o play.',
                   style: TextStyle(color: SpotFitColors.muted),
                 ),
+                if (catalog.errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Não deu para ler o catálogo no Supabase. Rode o SQL em supabase/migrations no SQL Editor.',
+                    style: TextStyle(color: SpotFitColors.coral),
+                  ),
+                ],
               ],
             ),
           ),

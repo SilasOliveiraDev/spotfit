@@ -114,20 +114,20 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: auth.enterDemo,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: SpotFitColors.text,
-                minimumSize: const Size.fromHeight(52),
-                side: const BorderSide(color: Colors.white24),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: const Text('Entrar no modo treino (demo)'),
-            ),
             if (!auth.usesSupabase) ...[
+              OutlinedButton(
+                onPressed: auth.enterDemo,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SpotFitColors.text,
+                  minimumSize: const Size.fromHeight(52),
+                  side: const BorderSide(color: Colors.white24),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Entrar no modo treino (demo)'),
+              ),
               const SizedBox(height: 16),
               const Text(
-                'Modo demo ativo: rode o SQL em supabase/migrations e passe SUPABASE_URL / SUPABASE_ANON_KEY no build para ligar a conta real.',
+                'Sem backend neste build — o modo demo usa o catálogo local.',
                 style: TextStyle(color: SpotFitColors.muted, fontSize: 12),
               ),
             ],

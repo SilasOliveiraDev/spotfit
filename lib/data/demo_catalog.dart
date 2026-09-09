@@ -153,7 +153,6 @@ List<Playlist> buildOfficialPlaylists() {
       description: 'BPM alto para corrida, bike e esteira.',
       coverUrl: _cover('pl-cardio'),
       isOfficial: true,
-      isPublic: true,
       tracks: [byId('t-pulse-run'), byId('t-sprint-city'), byId('t-box-jump')],
     ),
     Playlist(
@@ -163,7 +162,6 @@ List<Playlist> buildOfficialPlaylists() {
       description: 'Groove pesado para séries de força.',
       coverUrl: _cover('pl-muscle'),
       isOfficial: true,
-      isPublic: true,
       tracks: [byId('t-iron-set'), byId('t-heavy-rep'), byId('t-ignite')],
     ),
     Playlist(
@@ -173,7 +171,6 @@ List<Playlist> buildOfficialPlaylists() {
       description: 'Intervalos curtos, energia máxima.',
       coverUrl: _cover('pl-hiit'),
       isOfficial: true,
-      isPublic: true,
       tracks: [byId('t-tabata-fire'), byId('t-box-jump'), byId('t-pulse-run')],
     ),
     Playlist(
@@ -183,7 +180,6 @@ List<Playlist> buildOfficialPlaylists() {
       description: 'Respiração e mobilidade.',
       coverUrl: _cover('pl-yoga'),
       isOfficial: true,
-      isPublic: true,
       tracks: [byId('t-flow-breath'), byId('t-sun-salute'), byId('t-stretch-night')],
     ),
     Playlist(
@@ -193,7 +189,6 @@ List<Playlist> buildOfficialPlaylists() {
       description: '5 a 10 minutos para entrar no treino.',
       coverUrl: _cover('pl-warmup'),
       isOfficial: true,
-      isPublic: true,
       tracks: [byId('t-ignite'), byId('t-mobility'), byId('t-sun-salute')],
     ),
     Playlist(
@@ -203,7 +198,6 @@ List<Playlist> buildOfficialPlaylists() {
       description: 'Volta à calma e alongamento.',
       coverUrl: _cover('pl-cooldown'),
       isOfficial: true,
-      isPublic: true,
       tracks: [byId('t-slow-down'), byId('t-stretch-night'), byId('t-flow-breath')],
     ),
   ];

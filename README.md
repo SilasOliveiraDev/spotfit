@@ -1,50 +1,29 @@
 # SpotFit
 
-App de música no estilo Spotify/Deezer, pensado para treino: playlists por foco (Cardio, Músculo, HIIT, Yoga, aquecimento e volta à calma), player com play/pause/stop/repeat, favoritos e listas próprias. Stack: **Flutter + Supabase**.
+App Android e iOS de música para treino (Flutter + Supabase). Login só com e-mail e senha. Playlist compartilhada **somente por link** (`spotfit://playlist/{token}`).
 
-## O que já funciona
+O catálogo oficial (faixas e playlists Cardio/Músculo/…) deve ser gerido no **dashboard React** com a `service_role`. Este app não insere faixa de catálogo.
 
-- Tela de entrada (e-mail/senha quando o Supabase está ligado) e **modo demo** sem backend
-- Home com categorias de treino e playlists oficiais
-- Player: play, pause, stop, próxima, anterior, seek, repeat (off / playlist / faixa)
-- Favoritos
-- Criar playlist (ex.: Cardio, Muscle)
-- Busca por música, artista ou tipo de treino
-- Schema pronto para **compartilhar** (`is_public` + `playlist_shares`) — UI ainda mostra “em breve”
+## Schema
 
-## Rodar o app
+Arquivo único para colar no SQL Editor do projeto `elvdhgrpwutyonbuzgvb`:
+
+`supabase/migrations/20260309120000_init_spotfit.sql`
+
+Tabelas: `profiles`, `tracks`, `playlists`, `playlist_tracks`, `favorites`, `playlist_share_links`.  
+RPC: `get_shared_playlist(p_token)` — único jeito de abrir playlist de outra pessoa.
+
+## Auth no dashboard Supabase
+
+- Providers: **Email** ligado; sociais desligados
+- URL Configuration: Site URL do app e Redirect `spotfit://login-callback`
+
+## Rodar
 
 ```bash
 flutter pub get
-flutter run
+flutter run -d android
+flutter run -d ios
 ```
 
-Modo demo sobe sozinho se você **não** passar as chaves do Supabase.
-
-## Ligar o Supabase
-
-1. Crie um projeto em [supabase.com](https://supabase.com)
-2. SQL Editor: rode `supabase/migrations/20260309120000_init_spotfit.sql`
-3. Authentication → Providers: e-mail habilitado
-4. Rode o app com as chaves **anon/publishable** (nunca a `service_role`):
-
-```bash
-flutter run --dart-define=SUPABASE_URL=https://SEU-PROJETO.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=sua-chave-anon
-```
-
-## O que você ainda precisa me passar (próxima etapa)
-
-Nada disso bloqueia o demo, mas é o que falta para ficar “produto”:
-
-1. **URL e chave anon** do projeto Supabase (ou autenticar o MCP do Supabase neste workspace)
-2. **Áudios reais** (licença + arquivos no Storage) no lugar dos MP3 de demonstração
-3. Capas/artistas oficiais, se quiser branding próprio
-4. Login social (Google/Apple) e deep links
-5. Regras de compartilhamento: feed público, convite por e-mail, ou só amigos
-6. Plataforma alvo agora: Android, iOS, ou os dois
-
-## Estrutura
-
-- `lib/` — Flutter (UI, player, auth, catálogo)
-- `supabase/migrations/` — Postgres + RLS
+A URL e a chave **anon** já estão em `lib/core/config.dart`. Não coloque `service_role` no Flutter.

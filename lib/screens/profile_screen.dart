@@ -42,7 +42,7 @@ class ProfileScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         const Text(
-          'Compartilhar playlists com outros atletas está no schema (is_public + playlist_shares). Liga o Supabase e a gente ativa o feed na próxima etapa.',
+          'Compartilhe uma playlist só com quem tiver o link (spotfit://playlist/…). Não existe feed público.',
           style: TextStyle(color: SpotFitColors.muted),
         ),
         const SizedBox(height: 24),

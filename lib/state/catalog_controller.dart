@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:spotfit/core/config.dart';
 import 'package:spotfit/data/demo_catalog.dart';
 import 'package:spotfit/models/playlist.dart';
 import 'package:spotfit/models/track.dart';
@@ -153,7 +155,7 @@ class CatalogController extends ChangeNotifier {
       workoutType: workoutType,
       description: description,
       userId: userId,
-      isPublic: false,
+      isOfficial: false,
       tracks: selected,
       coverUrl: selected.isNotEmpty ? selected.first.coverUrl : null,
     );
@@ -166,7 +168,6 @@ class CatalogController extends ChangeNotifier {
         'title': title,
         'description': description,
         'workout_type': workoutType,
-        'is_public': false,
         'is_official': false,
         'cover_url': playlist.coverUrl,
       });
@@ -210,5 +211,50 @@ class CatalogController extends ChangeNotifier {
       });
     }
     notifyListeners();
+  }
+
+  Future<String> shareLinkFor(Playlist playlist) async {
+    if (!remote) {
+      return AppConfig.shareUri('demo-${playlist.id}');
+    }
+    final client = _client!;
+    final existing = await client
+        .from('playlist_share_links')
+        .select('token')
+        .eq('playlist_id', playlist.id)
+        .maybeSingle();
+    if (existing != null && existing['token'] is String) {
+      return AppConfig.shareUri(existing['token'] as String);
+    }
+    final inserted = await client
+        .from('playlist_share_links')
+        .insert({
+          'playlist_id': playlist.id,
+          'created_by': userId,
+        })
+        .select('token')
+        .single();
+    return AppConfig.shareUri(inserted['token'] as String);
+  }
+
+  Future<Playlist?> playlistFromShareToken(String token) async {
+    if (!remote) {
+      final id = token.startsWith('demo-') ? token.substring(5) : token;
+      for (final item in playlists) {
+        if (item.id == id) return item;
+      }
+      return null;
+    }
+    final raw = await _client!.rpc('get_shared_playlist', params: {'p_token': token});
+    if (raw == null) return null;
+    final data = Map<String, dynamic>.from(
+      raw is String ? jsonDecode(raw) as Map : raw as Map,
+    );
+    final playlistMap = Map<String, dynamic>.from(data['playlist'] as Map);
+    final trackRows = (data['tracks'] as List?) ?? const [];
+    final tracks = trackRows
+        .map((row) => Track.fromMap(Map<String, dynamic>.from(row as Map)))
+        .toList();
+    return Playlist.fromMap(playlistMap, tracks: tracks);
   }
 }

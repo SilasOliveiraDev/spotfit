@@ -8,8 +8,8 @@ class Playlist {
     this.description,
     this.coverUrl,
     this.userId,
-    this.isPublic = false,
     this.isOfficial = false,
+    this.shareToken,
     this.tracks = const [],
   });
 
@@ -19,11 +19,11 @@ class Playlist {
   final String? description;
   final String? coverUrl;
   final String? userId;
-  final bool isPublic;
   final bool isOfficial;
+  final String? shareToken;
   final List<Track> tracks;
 
-  Playlist copyWith({List<Track>? tracks, String? title, bool? isPublic}) {
+  Playlist copyWith({List<Track>? tracks, String? title, String? shareToken}) {
     return Playlist(
       id: id,
       title: title ?? this.title,
@@ -31,8 +31,8 @@ class Playlist {
       description: description,
       coverUrl: coverUrl,
       userId: userId,
-      isPublic: isPublic ?? this.isPublic,
       isOfficial: isOfficial,
+      shareToken: shareToken ?? this.shareToken,
       tracks: tracks ?? this.tracks,
     );
   }
@@ -45,7 +45,6 @@ class Playlist {
       description: map['description'] as String?,
       coverUrl: map['cover_url'] as String?,
       userId: map['user_id'] as String?,
-      isPublic: map['is_public'] as bool? ?? false,
       isOfficial: map['is_official'] as bool? ?? false,
       tracks: tracks,
     );

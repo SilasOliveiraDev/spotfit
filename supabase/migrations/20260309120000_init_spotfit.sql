@@ -1,4 +1,8 @@
--- SpotFit schema: catálogo, playlists de treino, favoritos e base para compartilhar.
+-- SpotFit — catálogo, playlists, favoritos e share por link secreto.
+-- O dashboard React (service_role) gerencia tracks/playlists oficiais.
+-- O app Android/iOS (anon + authenticated + RLS) consome e cria listas do atleta.
+-- Quem tem o link acessa só via RPC get_shared_playlist(token). Não há feed público.
+
 create schema if not exists private;
 
 create or replace function private.set_updated_at()
@@ -39,7 +43,6 @@ create table if not exists public.playlists (
   description text,
   cover_url text,
   workout_type text not null default 'treino',
-  is_public boolean not null default false,
   is_official boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -61,13 +64,19 @@ create table if not exists public.favorites (
   primary key (user_id, track_id)
 );
 
-create table if not exists public.playlist_shares (
-  id uuid primary key default gen_random_uuid(),
-  playlist_id uuid not null references public.playlists (id) on delete cascade,
-  owner_id uuid not null references auth.users (id) on delete cascade,
-  shared_with uuid references auth.users (id) on delete cascade,
+-- Um token por playlist. Quem tem o link abre spotfit://playlist/{token}
+create table if not exists public.playlist_share_links (
+  token text primary key default encode(gen_random_bytes(18), 'hex'),
+  playlist_id uuid not null unique references public.playlists (id) on delete cascade,
+  created_by uuid not null references auth.users (id) on delete cascade,
+  revoked_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+create index if not exists tracks_workout_tags_idx on public.tracks using gin (workout_tags);
+create index if not exists playlists_user_id_idx on public.playlists (user_id);
+create index if not exists playlists_official_idx on public.playlists (is_official) where is_official;
+create index if not exists playlist_tracks_track_id_idx on public.playlist_tracks (track_id);
 
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
@@ -90,7 +99,8 @@ begin
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1), 'Atleta')
-  );
+  )
+  on conflict (id) do nothing;
   return new;
 end;
 $$;
@@ -100,12 +110,55 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function private.handle_new_user();
 
+create or replace function private.get_shared_playlist(p_token text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  result jsonb;
+begin
+  if p_token is null or length(trim(p_token)) < 16 then
+    return null;
+  end if;
+
+  select jsonb_build_object(
+    'playlist', to_jsonb(p),
+    'tracks', coalesce((
+      select jsonb_agg(to_jsonb(t) order by pt.position)
+      from public.playlist_tracks pt
+      join public.tracks t on t.id = pt.track_id
+      where pt.playlist_id = p.id
+    ), '[]'::jsonb)
+  )
+  into result
+  from public.playlist_share_links l
+  join public.playlists p on p.id = l.playlist_id
+  where l.token = trim(p_token)
+    and l.revoked_at is null;
+
+  return result;
+end;
+$$;
+
+create or replace function public.get_shared_playlist(p_token text)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select private.get_shared_playlist(p_token);
+$$;
+
 alter table public.profiles enable row level security;
 alter table public.tracks enable row level security;
 alter table public.playlists enable row level security;
 alter table public.playlist_tracks enable row level security;
 alter table public.favorites enable row level security;
-alter table public.playlist_shares enable row level security;
+alter table public.playlist_share_links enable row level security;
 
 drop policy if exists "profiles_select_authenticated" on public.profiles;
 create policy "profiles_select_authenticated"
@@ -118,15 +171,16 @@ on public.profiles for update to authenticated
 using (id = auth.uid())
 with check (id = auth.uid());
 
+drop policy if exists "tracks_read_authenticated" on public.tracks;
 drop policy if exists "tracks_read_all" on public.tracks;
-create policy "tracks_read_all"
-on public.tracks for select to anon, authenticated
+create policy "tracks_read_authenticated"
+on public.tracks for select to authenticated
 using (true);
 
 drop policy if exists "playlists_read_visible" on public.playlists;
-create policy "playlists_read_visible"
-on public.playlists for select to anon, authenticated
-using (is_official or is_public or user_id = auth.uid());
+create policy "playlists_read_own_or_official"
+on public.playlists for select to authenticated
+using (is_official or user_id = auth.uid());
 
 drop policy if exists "playlists_insert_own" on public.playlists;
 create policy "playlists_insert_own"
@@ -146,12 +200,12 @@ using (user_id = auth.uid());
 
 drop policy if exists "playlist_tracks_read" on public.playlist_tracks;
 create policy "playlist_tracks_read"
-on public.playlist_tracks for select to anon, authenticated
+on public.playlist_tracks for select to authenticated
 using (
   exists (
     select 1 from public.playlists p
     where p.id = playlist_id
-      and (p.is_official or p.is_public or p.user_id = auth.uid())
+      and (p.is_official or p.user_id = auth.uid())
   )
 );
 
@@ -175,41 +229,62 @@ using (
   )
 );
 
-drop policy if exists "favorites_own_all" on public.favorites;
+drop policy if exists "favorites_select_own" on public.favorites;
 create policy "favorites_select_own"
 on public.favorites for select to authenticated
 using (user_id = auth.uid());
 
+drop policy if exists "favorites_insert_own" on public.favorites;
 create policy "favorites_insert_own"
 on public.favorites for insert to authenticated
 with check (user_id = auth.uid());
 
+drop policy if exists "favorites_delete_own" on public.favorites;
 create policy "favorites_delete_own"
 on public.favorites for delete to authenticated
 using (user_id = auth.uid());
 
-drop policy if exists "shares_select" on public.playlist_shares;
-create policy "shares_select"
-on public.playlist_shares for select to authenticated
-using (owner_id = auth.uid() or shared_with = auth.uid());
+drop policy if exists "share_links_select_own" on public.playlist_share_links;
+create policy "share_links_select_own"
+on public.playlist_share_links for select to authenticated
+using (created_by = auth.uid());
 
-create policy "shares_insert_own"
-on public.playlist_shares for insert to authenticated
-with check (owner_id = auth.uid());
+drop policy if exists "share_links_insert_own" on public.playlist_share_links;
+create policy "share_links_insert_own"
+on public.playlist_share_links for insert to authenticated
+with check (
+  created_by = auth.uid()
+  and exists (
+    select 1 from public.playlists p
+    where p.id = playlist_id and p.user_id = auth.uid()
+  )
+);
 
-create policy "shares_delete_own"
-on public.playlist_shares for delete to authenticated
-using (owner_id = auth.uid());
+drop policy if exists "share_links_update_own" on public.playlist_share_links;
+create policy "share_links_update_own"
+on public.playlist_share_links for update to authenticated
+using (created_by = auth.uid())
+with check (created_by = auth.uid());
+
+drop policy if exists "share_links_delete_own" on public.playlist_share_links;
+create policy "share_links_delete_own"
+on public.playlist_share_links for delete to authenticated
+using (created_by = auth.uid());
 
 grant usage on schema public to anon, authenticated;
-grant select on public.tracks to anon, authenticated;
-grant select on public.playlists to anon, authenticated;
-grant select on public.playlist_tracks to anon, authenticated;
+grant usage on schema private to anon, authenticated;
+
+grant execute on function private.get_shared_playlist(text) to anon, authenticated;
+grant execute on function public.get_shared_playlist(text) to anon, authenticated;
+
+grant select on public.tracks to authenticated;
+grant select on public.playlists to authenticated;
+grant select on public.playlist_tracks to authenticated;
 grant select, update on public.profiles to authenticated;
 grant insert, update, delete on public.playlists to authenticated;
 grant insert, delete on public.playlist_tracks to authenticated;
 grant select, insert, delete on public.favorites to authenticated;
-grant select, insert, delete on public.playlist_shares to authenticated;
+grant select, insert, update, delete on public.playlist_share_links to authenticated;
 
 insert into public.tracks (id, title, artist, duration_ms, audio_url, cover_url, bpm, workout_tags)
 values
@@ -227,14 +302,14 @@ values
   ('11111111-1111-4111-8111-111111111112', 'Stretch Night', 'Afterburn', 402000, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', 'https://picsum.photos/seed/stretch-night/640/640', 64, array['cooldown','yoga'])
 on conflict (id) do nothing;
 
-insert into public.playlists (id, title, description, cover_url, workout_type, is_public, is_official)
+insert into public.playlists (id, title, description, cover_url, workout_type, is_official)
 values
-  ('22222222-2222-4222-8222-222222222201', 'Cardio Endurance', 'BPM alto para corrida, bike e esteira.', 'https://picsum.photos/seed/pl-cardio/640/640', 'cardio', true, true),
-  ('22222222-2222-4222-8222-222222222202', 'Muscle Power', 'Groove pesado para séries de força.', 'https://picsum.photos/seed/pl-muscle/640/640', 'muscle', true, true),
-  ('22222222-2222-4222-8222-222222222203', 'HIIT Blast', 'Intervalos curtos, energia máxima.', 'https://picsum.photos/seed/pl-hiit/640/640', 'hiit', true, true),
-  ('22222222-2222-4222-8222-222222222204', 'Yoga Flow', 'Respiração e mobilidade.', 'https://picsum.photos/seed/pl-yoga/640/640', 'yoga', true, true),
-  ('22222222-2222-4222-8222-222222222205', 'Aquecimento', '5 a 10 minutos para entrar no treino.', 'https://picsum.photos/seed/pl-warmup/640/640', 'warmup', true, true),
-  ('22222222-2222-4222-8222-222222222206', 'Desacelerar', 'Volta à calma e alongamento.', 'https://picsum.photos/seed/pl-cooldown/640/640', 'cooldown', true, true)
+  ('22222222-2222-4222-8222-222222222201', 'Cardio Endurance', 'BPM alto para corrida, bike e esteira.', 'https://picsum.photos/seed/pl-cardio/640/640', 'cardio', true),
+  ('22222222-2222-4222-8222-222222222202', 'Muscle Power', 'Groove pesado para séries de força.', 'https://picsum.photos/seed/pl-muscle/640/640', 'muscle', true),
+  ('22222222-2222-4222-8222-222222222203', 'HIIT Blast', 'Intervalos curtos, energia máxima.', 'https://picsum.photos/seed/pl-hiit/640/640', 'hiit', true),
+  ('22222222-2222-4222-8222-222222222204', 'Yoga Flow', 'Respiração e mobilidade.', 'https://picsum.photos/seed/pl-yoga/640/640', 'yoga', true),
+  ('22222222-2222-4222-8222-222222222205', 'Aquecimento', '5 a 10 minutos para entrar no treino.', 'https://picsum.photos/seed/pl-warmup/640/640', 'warmup', true),
+  ('22222222-2222-4222-8222-222222222206', 'Desacelerar', 'Volta à calma e alongamento.', 'https://picsum.photos/seed/pl-cooldown/640/640', 'cooldown', true)
 on conflict (id) do nothing;
 
 insert into public.playlist_tracks (playlist_id, track_id, position)

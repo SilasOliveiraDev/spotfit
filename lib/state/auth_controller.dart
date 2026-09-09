@@ -95,11 +95,17 @@ class AuthController extends ChangeNotifier {
     }
     try {
       errorMessage = null;
-      await _client!.auth.signUp(
+      final response = await _client!.auth.signUp(
         email: email,
         password: password,
         data: {'display_name': name},
       );
+      if (response.session == null) {
+        errorMessage =
+            'Conta criada. Confirme o e-mail (caixa de entrada) e depois entre.';
+        notifyListeners();
+        return false;
+      }
       return true;
     } on AuthException catch (error) {
       errorMessage = error.message;

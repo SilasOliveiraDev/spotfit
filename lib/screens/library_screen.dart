@@ -126,8 +126,7 @@ class _PlaylistsTab extends StatelessWidget {
       leading: CoverImage(url: playlist.coverUrl, size: 56, radius: 8),
       title: Text(playlist.title, style: const TextStyle(fontWeight: FontWeight.w700)),
       subtitle: Text(
-        '${workoutById(playlist.workoutType).label} · ${playlist.tracks.length} faixas'
-        '${playlist.isPublic ? ' · compartilhada' : ''}',
+        '${workoutById(playlist.workoutType).label} · ${playlist.tracks.length} faixas',
       ),
       trailing: canDelete
           ? IconButton(
