@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -9,8 +11,8 @@ class CatalogController extends ChangeNotifier {
   CatalogController({SupabaseClient? client, required this.userId})
       : _client = client;
 
-  final SupabaseClient? _client;
-  final String userId;
+  SupabaseClient? _client;
+  String userId;
   final _uuid = const Uuid();
 
   List<Track> tracks = [];
@@ -20,6 +22,13 @@ class CatalogController extends ChangeNotifier {
   String? errorMessage;
 
   bool get remote => _client != null;
+
+  void rebind({required String userId, SupabaseClient? client}) {
+    if (this.userId == userId && _client == client) return;
+    this.userId = userId;
+    _client = client;
+    Future<void>(() => load());
+  }
 
   List<Playlist> officialPlaylists() =>
       playlists.where((item) => item.isOfficial).toList();
@@ -66,12 +75,13 @@ class CatalogController extends ChangeNotifier {
   }
 
   Future<void> _loadRemote() async {
-    final trackRows = await _client!.from('tracks').select();
+    final client = _client!;
+    final trackRows = await client.from('tracks').select();
     tracks = (trackRows as List)
         .map((row) => Track.fromMap(Map<String, dynamic>.from(row as Map)))
         .toList();
 
-    final playlistRows = await _client
+    final playlistRows = await client
         .from('playlists')
         .select()
         .or('is_official.eq.true,user_id.eq.$userId');
@@ -79,7 +89,7 @@ class CatalogController extends ChangeNotifier {
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList();
 
-    final junction = await _client.from('playlist_tracks').select();
+    final junction = await client.from('playlist_tracks').select();
     final byPlaylist = <String, List<Map<String, dynamic>>>{};
     for (final row in junction as List) {
       final map = Map<String, dynamic>.from(row as Map);
@@ -98,7 +108,7 @@ class CatalogController extends ChangeNotifier {
       return Playlist.fromMap(row, tracks: playlistTracks);
     }).toList();
 
-    final favRows = await _client
+    final favRows = await client
         .from('favorites')
         .select('track_id')
         .eq('user_id', userId);
@@ -149,7 +159,8 @@ class CatalogController extends ChangeNotifier {
     );
 
     if (remote) {
-      await _client!.from('playlists').insert({
+      final client = _client!;
+      await client.from('playlists').insert({
         'id': playlist.id,
         'user_id': userId,
         'title': title,
@@ -160,7 +171,7 @@ class CatalogController extends ChangeNotifier {
         'cover_url': playlist.coverUrl,
       });
       if (selected.isNotEmpty) {
-        await _client.from('playlist_tracks').insert([
+        await client.from('playlist_tracks').insert([
           for (var i = 0; i < selected.length; i++)
             {
               'playlist_id': playlist.id,

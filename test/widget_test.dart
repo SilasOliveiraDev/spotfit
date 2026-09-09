@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotfit/app.dart';
 import 'package:spotfit/player/player_controller.dart';
 import 'package:spotfit/state/auth_controller.dart';
+import 'package:spotfit/state/catalog_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,9 @@ void main() {
         providers: [
           ChangeNotifierProvider.value(value: auth),
           ChangeNotifierProvider(create: (_) => PlayerController()),
+          ChangeNotifierProvider(
+            create: (_) => CatalogController(userId: 'demo-user'),
+          ),
         ],
         child: const SpotFitApp(),
       ),

@@ -5,6 +5,7 @@ import 'package:spotfit/app.dart';
 import 'package:spotfit/core/config.dart';
 import 'package:spotfit/player/player_controller.dart';
 import 'package:spotfit/state/auth_controller.dart';
+import 'package:spotfit/state/catalog_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,7 @@ Future<void> main() async {
 
   final auth = AuthController(client: supabase);
   final player = PlayerController();
+  final catalog = CatalogController(userId: 'demo-user');
   await Future.wait([auth.bootstrap(), player.init()]);
 
   runApp(
@@ -27,6 +29,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider.value(value: player),
+        ChangeNotifierProvider.value(value: catalog),
       ],
       child: const SpotFitApp(),
     ),

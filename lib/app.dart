@@ -34,12 +34,12 @@ class _Root extends StatelessWidget {
     if (!auth.isSignedIn) {
       return const AuthScreen();
     }
-    return ChangeNotifierProvider(
-      create: (_) => CatalogController(
-        client: auth.usesSupabase ? auth.client : null,
-        userId: auth.profile!.id,
-      ),
-      child: const ShellScreen(),
+
+    final catalog = context.read<CatalogController>();
+    catalog.rebind(
+      userId: auth.profile!.id,
+      client: auth.usesSupabase ? auth.client : null,
     );
+    return const ShellScreen();
   }
 }
