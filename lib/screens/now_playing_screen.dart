@@ -124,13 +124,13 @@ class NowPlayingScreen extends StatelessWidget {
     return '$m:$s';
   }
 
-  String _repeatLabel(RepeatMode mode) {
+  String _repeatLabel(PlaybackRepeat mode) {
     switch (mode) {
-      case RepeatMode.off:
+      case PlaybackRepeat.off:
         return 'Repeat desligado';
-      case RepeatMode.all:
+      case PlaybackRepeat.all:
         return 'Repeat da playlist';
-      case RepeatMode.one:
+      case PlaybackRepeat.one:
         return 'Repeat da faixa';
     }
   }
