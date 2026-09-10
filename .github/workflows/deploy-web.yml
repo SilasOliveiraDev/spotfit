@@ -1,4 +1,5 @@
 name: Deploy SpotFit Web
+# Retrigger after making the repo public
 
 on:
   push:
