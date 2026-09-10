@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:spotfit/core/share_links.dart';
@@ -27,6 +28,7 @@ class _SpotFitAppState extends State<SpotFitApp> {
   @override
   void initState() {
     super.initState();
+    if (kIsWeb) return;
     try {
       final links = AppLinks();
       _linkSub = links.uriLinkStream.listen(_handleUri);

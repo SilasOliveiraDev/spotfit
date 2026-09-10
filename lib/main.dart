@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,18 +13,25 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   SupabaseClient? supabase;
-  if (AppConfig.hasSupabase) {
-    await Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      publishableKey: AppConfig.supabaseAnonKey,
-    );
-    supabase = Supabase.instance.client;
+  try {
+    if (AppConfig.hasSupabase) {
+      await Supabase.initialize(
+        url: AppConfig.supabaseUrl,
+        publishableKey: AppConfig.supabaseAnonKey,
+      ).timeout(const Duration(seconds: 12));
+      supabase = Supabase.instance.client;
+    }
+  } catch (_) {
+    supabase = null;
   }
 
   final auth = AuthController(client: supabase);
   final player = PlayerController();
   final catalog = CatalogController(userId: 'demo-user');
-  await Future.wait([auth.bootstrap(), player.init()]);
+  try {
+    await auth.bootstrap().timeout(const Duration(seconds: 8));
+  } catch (_) {}
+  unawaited(player.init());
 
   runApp(
     MultiProvider(

@@ -18,7 +18,26 @@ RPC: `get_shared_playlist(p_token)` — único jeito de abrir playlist de outra 
 - Providers: **Email** ligado; sociais desligados
 - URL Configuration: Site URL do app e Redirect `spotfit://login-callback`
 
-## Rodar
+## Rodar no navegador (Chrome)
+
+Na pasta do projeto, no **seu** computador (não use o localhost de outra máquina):
+
+```bash
+flutter pub get
+flutter run -d chrome
+```
+
+Se o Chrome não aparecer na lista: `flutter devices` e instale o Chrome.
+Build estático (abre sem debugger):
+
+```bash
+flutter build web
+python3 -m http.server 8080 --directory build/web
+```
+
+Depois abra http://localhost:8080
+
+## Android / iOS
 
 ```bash
 flutter pub get

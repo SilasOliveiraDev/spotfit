@@ -32,8 +32,12 @@ class PlayerController extends ChangeNotifier {
   RepeatMode get repeat => queue.repeat;
 
   Future<void> init() async {
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.music());
+    if (!kIsWeb) {
+      try {
+        final session = await AudioSession.instance;
+        await session.configure(const AudioSessionConfiguration.music());
+      } catch (_) {}
+    }
     _stateSub = _player.playerStateStream.listen((state) {
       isPlaying = state.playing;
       isLoading = state.processingState == ProcessingState.loading ||
