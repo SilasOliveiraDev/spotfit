@@ -18,6 +18,17 @@ RPC: `get_shared_playlist(p_token)` — único jeito de abrir playlist de outra 
 - Providers: **Email** ligado; sociais desligados
 - URL Configuration: Site URL do app e Redirect `spotfit://login-callback`
 
+## No GitHub
+
+Repositório: https://github.com/SilasOliveiraDev/spotfit
+
+Depois do merge em `main`, o GitHub Actions publica o web em:
+
+https://silasoliveiradev.github.io/spotfit/
+
+Em **Settings → Pages → Source** escolha **GitHub Actions** na primeira vez.
+No Supabase → Authentication → URL Configuration, acrescente essa URL nas Redirect URLs.
+
 ## Rodar no navegador (Chrome)
 
 Na pasta do projeto, no **seu** computador (não use o localhost de outra máquina):
