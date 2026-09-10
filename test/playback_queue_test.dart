@@ -12,7 +12,7 @@ void main() {
   });
 
   test('repeat all volta ao início', () {
-    final queue = PlaybackQueue(trackIds: ['a', 'b'], repeat: RepeatMode.all);
+    final queue = PlaybackQueue(trackIds: ['a', 'b'], repeat: PlaybackRepeat.all);
     queue.index = 1;
     expect(queue.moveNext(), isTrue);
     expect(queue.currentId, 'a');
@@ -26,15 +26,15 @@ void main() {
   });
 
   test('repeat one não troca de faixa', () {
-    final queue = PlaybackQueue(trackIds: ['a', 'b'], repeat: RepeatMode.one);
+    final queue = PlaybackQueue(trackIds: ['a', 'b'], repeat: PlaybackRepeat.one);
     expect(queue.moveNext(), isTrue);
     expect(queue.currentId, 'a');
   });
 
   test('ciclo de repeat', () {
     final queue = PlaybackQueue();
-    expect(queue.nextRepeat(), RepeatMode.all);
-    expect(queue.nextRepeat(), RepeatMode.one);
-    expect(queue.nextRepeat(), RepeatMode.off);
+    expect(queue.nextRepeat(), PlaybackRepeat.all);
+    expect(queue.nextRepeat(), PlaybackRepeat.one);
+    expect(queue.nextRepeat(), PlaybackRepeat.off);
   });
 }

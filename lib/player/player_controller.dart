@@ -29,7 +29,7 @@ class PlayerController extends ChangeNotifier {
     return _byId[id];
   }
 
-  RepeatMode get repeat => queue.repeat;
+  PlaybackRepeat get repeat => queue.repeat;
 
   Future<void> init() async {
     if (!kIsWeb) {
@@ -114,7 +114,7 @@ class PlayerController extends ChangeNotifier {
   void cycleRepeat() {
     queue.nextRepeat();
     unawaited(_player.setLoopMode(
-      queue.repeat == RepeatMode.one ? LoopMode.one : LoopMode.off,
+      queue.repeat == PlaybackRepeat.one ? LoopMode.one : LoopMode.off,
     ));
     notifyListeners();
   }
@@ -123,7 +123,7 @@ class PlayerController extends ChangeNotifier {
     if (_handlingComplete) return;
     _handlingComplete = true;
     try {
-      if (queue.repeat == RepeatMode.one) {
+      if (queue.repeat == PlaybackRepeat.one) {
         await _player.seek(Duration.zero);
         await _player.play();
         return;
@@ -142,7 +142,7 @@ class PlayerController extends ChangeNotifier {
     try {
       await _player.setUrl(track.audioUrl);
       await _player.setLoopMode(
-        queue.repeat == RepeatMode.one ? LoopMode.one : LoopMode.off,
+        queue.repeat == PlaybackRepeat.one ? LoopMode.one : LoopMode.off,
       );
       if (autoPlay) await _player.play();
     } catch (_) {

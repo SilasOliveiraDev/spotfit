@@ -147,16 +147,16 @@ class TrackTile extends StatelessWidget {
 class RepeatIcon extends StatelessWidget {
   const RepeatIcon({super.key, required this.mode});
 
-  final RepeatMode mode;
+  final PlaybackRepeat mode;
 
   @override
   Widget build(BuildContext context) {
     switch (mode) {
-      case RepeatMode.off:
+      case PlaybackRepeat.off:
         return const Icon(Icons.repeat_rounded, color: SpotFitColors.muted);
-      case RepeatMode.all:
+      case PlaybackRepeat.all:
         return const Icon(Icons.repeat_rounded, color: SpotFitColors.lime);
-      case RepeatMode.one:
+      case PlaybackRepeat.one:
         return const Icon(Icons.repeat_one_rounded, color: SpotFitColors.lime);
     }
   }
