@@ -16,7 +16,8 @@ class PlayerController extends ChangeNotifier {
   StreamSubscription<PlayerState>? _stateSub;
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
-  bool _handlingComplete = false;
+  StreamSubscription<int?>? _indexSub;
+  var _loadGeneration = 0;
 
   Duration position = Duration.zero;
   Duration duration = Duration.zero;
@@ -42,9 +43,6 @@ class PlayerController extends ChangeNotifier {
       isPlaying = state.playing;
       isLoading = state.processingState == ProcessingState.loading ||
           state.processingState == ProcessingState.buffering;
-      if (state.processingState == ProcessingState.completed) {
-        unawaited(_onComplete());
-      }
       notifyListeners();
     });
     _positionSub = _player.positionStream.listen((value) {
@@ -55,6 +53,13 @@ class PlayerController extends ChangeNotifier {
       duration = value ?? Duration.zero;
       notifyListeners();
     });
+    _indexSub = _player.currentIndexStream.listen((index) {
+      if (index == null || index == queue.index) return;
+      if (index >= 0 && index < queue.trackIds.length) {
+        queue.index = index;
+        notifyListeners();
+      }
+    });
   }
 
   Future<void> playTracks(List<Track> tracks, {int startIndex = 0}) async {
@@ -63,13 +68,13 @@ class PlayerController extends ChangeNotifier {
       _byId[track.id] = track;
     }
     queue.replace(tracks.map((track) => track.id).toList(), startIndex: startIndex);
-    await _loadCurrent(autoPlay: true);
+    await _loadQueue(autoPlay: true);
   }
 
   Future<void> play() async {
     if (queue.isEmpty) return;
-    if (_player.processingState == ProcessingState.idle) {
-      await _loadCurrent(autoPlay: true);
+    if (_player.audioSource == null) {
+      await _loadQueue(autoPlay: true);
       return;
     }
     await _player.play();
@@ -93,11 +98,17 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> next() async {
-    if (queue.moveNext()) {
-      await _loadCurrent(autoPlay: true);
-    } else {
-      await stop();
+    if (_player.hasNext) {
+      await _player.seekToNext();
+      await _player.play();
+      return;
     }
+    if (queue.repeat == PlaybackRepeat.all && queue.trackIds.isNotEmpty) {
+      await _player.seek(Duration.zero, index: 0);
+      await _player.play();
+      return;
+    }
+    await stop();
   }
 
   Future<void> previous() async {
@@ -105,45 +116,63 @@ class PlayerController extends ChangeNotifier {
       await seek(Duration.zero);
       return;
     }
-    queue.movePrevious();
-    await _loadCurrent(autoPlay: true);
+    if (_player.hasPrevious) {
+      await _player.seekToPrevious();
+      await _player.play();
+      return;
+    }
+    if (queue.repeat == PlaybackRepeat.all && queue.trackIds.isNotEmpty) {
+      await _player.seek(Duration.zero, index: queue.trackIds.length - 1);
+      await _player.play();
+    }
   }
 
   Future<void> seek(Duration value) => _player.seek(value);
 
   void cycleRepeat() {
     queue.nextRepeat();
-    unawaited(_player.setLoopMode(
-      queue.repeat == PlaybackRepeat.one ? LoopMode.one : LoopMode.off,
-    ));
+    unawaited(_player.setLoopMode(_loopMode()));
     notifyListeners();
   }
 
-  Future<void> _onComplete() async {
-    if (_handlingComplete) return;
-    _handlingComplete = true;
-    try {
-      if (queue.repeat == PlaybackRepeat.one) {
-        await _player.seek(Duration.zero);
-        await _player.play();
-        return;
-      }
-      await next();
-    } finally {
-      _handlingComplete = false;
+  LoopMode _loopMode() {
+    switch (queue.repeat) {
+      case PlaybackRepeat.off:
+        return LoopMode.off;
+      case PlaybackRepeat.all:
+        return LoopMode.all;
+      case PlaybackRepeat.one:
+        return LoopMode.one;
     }
   }
 
-  Future<void> _loadCurrent({required bool autoPlay}) async {
-    final track = currentTrack;
-    if (track == null) return;
+  Future<void> _loadQueue({required bool autoPlay}) async {
+    if (queue.isEmpty) return;
+    final generation = ++_loadGeneration;
     isLoading = true;
     notifyListeners();
     try {
-      await _player.setUrl(track.audioUrl);
-      await _player.setLoopMode(
-        queue.repeat == PlaybackRepeat.one ? LoopMode.one : LoopMode.off,
+      await _player.stop();
+      final ids = List<String>.of(queue.trackIds);
+      final sources = <AudioSource>[];
+      for (final id in ids) {
+        final track = _byId[id];
+        if (track == null) continue;
+        sources.add(
+          AudioSource.uri(
+            Uri.parse(track.audioUrl),
+            tag: '${track.id}:${track.audioUrl}',
+          ),
+        );
+      }
+      if (sources.isEmpty || generation != _loadGeneration) return;
+      await _player.setAudioSources(
+        sources,
+        initialIndex: queue.index.clamp(0, sources.length - 1),
+        initialPosition: Duration.zero,
       );
+      await _player.setLoopMode(_loopMode());
+      if (generation != _loadGeneration) return;
       if (autoPlay) await _player.play();
     } catch (_) {
       isLoading = false;
@@ -157,6 +186,7 @@ class PlayerController extends ChangeNotifier {
     unawaited(_stateSub?.cancel());
     unawaited(_positionSub?.cancel());
     unawaited(_durationSub?.cancel());
+    unawaited(_indexSub?.cancel());
     unawaited(_player.dispose());
     super.dispose();
   }
