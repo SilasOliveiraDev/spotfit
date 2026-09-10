@@ -9,7 +9,7 @@ import 'package:spotfit/player/playback_queue.dart';
 class PlayerController extends ChangeNotifier {
   PlayerController({AudioPlayer? player}) : _player = player ?? AudioPlayer();
 
-  final AudioPlayer _player;
+  AudioPlayer _player;
   final PlaybackQueue queue = PlaybackQueue();
   final Map<String, Track> _byId = {};
 
@@ -18,6 +18,8 @@ class PlayerController extends ChangeNotifier {
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<int?>? _indexSub;
   var _loadGeneration = 0;
+  var _ignoreIndexEvents = false;
+  var _bound = false;
 
   Duration position = Duration.zero;
   Duration duration = Duration.zero;
@@ -39,6 +41,15 @@ class PlayerController extends ChangeNotifier {
         await session.configure(const AudioSessionConfiguration.music());
       } catch (_) {}
     }
+    _bindPlayer();
+  }
+
+  void _bindPlayer() {
+    unawaited(_stateSub?.cancel());
+    unawaited(_positionSub?.cancel());
+    unawaited(_durationSub?.cancel());
+    unawaited(_indexSub?.cancel());
+
     _stateSub = _player.playerStateStream.listen((state) {
       isPlaying = state.playing;
       isLoading = state.processingState == ProcessingState.loading ||
@@ -54,12 +65,13 @@ class PlayerController extends ChangeNotifier {
       notifyListeners();
     });
     _indexSub = _player.currentIndexStream.listen((index) {
-      if (index == null || index == queue.index) return;
+      if (_ignoreIndexEvents || index == null || index == queue.index) return;
       if (index >= 0 && index < queue.trackIds.length) {
         queue.index = index;
         notifyListeners();
       }
     });
+    _bound = true;
   }
 
   Future<void> playTracks(List<Track> tracks, {int startIndex = 0}) async {
@@ -67,13 +79,29 @@ class PlayerController extends ChangeNotifier {
     for (final track in tracks) {
       _byId[track.id] = track;
     }
-    queue.replace(tracks.map((track) => track.id).toList(), startIndex: startIndex);
+    final ids = tracks.map((track) => track.id).toList();
+    final start = startIndex.clamp(0, ids.length - 1);
+
+    if (_sameIds(ids, queue.trackIds) && _player.audioSources.isNotEmpty) {
+      queue.index = start;
+      notifyListeners();
+      _ignoreIndexEvents = true;
+      try {
+        await _player.seek(Duration.zero, index: start);
+        await _player.play();
+      } finally {
+        _ignoreIndexEvents = false;
+      }
+      return;
+    }
+
+    queue.replace(ids, startIndex: start);
     await _loadQueue(autoPlay: true);
   }
 
   Future<void> play() async {
     if (queue.isEmpty) return;
-    if (_player.audioSource == null) {
+    if (_player.audioSources.isEmpty) {
       await _loadQueue(autoPlay: true);
       return;
     }
@@ -148,29 +176,38 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> _loadQueue({required bool autoPlay}) async {
     if (queue.isEmpty) return;
+    if (!_bound) _bindPlayer();
     final generation = ++_loadGeneration;
     isLoading = true;
     notifyListeners();
+    _ignoreIndexEvents = true;
     try {
-      await _player.stop();
-      final ids = List<String>.of(queue.trackIds);
+      if (kIsWeb) {
+        await _rebuildWebPlayer();
+      } else {
+        await _player.stop();
+      }
+
       final sources = <AudioSource>[];
-      for (final id in ids) {
+      for (final id in queue.trackIds) {
         final track = _byId[id];
-        if (track == null) continue;
+        if (track == null || track.audioUrl.isEmpty) continue;
         sources.add(
           AudioSource.uri(
             Uri.parse(track.audioUrl),
-            tag: '${track.id}:${track.audioUrl}',
+            tag: '${track.id}|${track.audioUrl}',
           ),
         );
       }
       if (sources.isEmpty || generation != _loadGeneration) return;
+
+      final start = queue.index.clamp(0, sources.length - 1);
       await _player.setAudioSources(
         sources,
-        initialIndex: queue.index.clamp(0, sources.length - 1),
+        initialIndex: start,
         initialPosition: Duration.zero,
       );
+      await _player.seek(Duration.zero, index: start);
       await _player.setLoopMode(_loopMode());
       if (generation != _loadGeneration) return;
       if (autoPlay) await _player.play();
@@ -178,7 +215,27 @@ class PlayerController extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
       rethrow;
+    } finally {
+      _ignoreIndexEvents = false;
     }
+  }
+
+  Future<void> _rebuildWebPlayer() async {
+    final previous = _player;
+    _player = AudioPlayer();
+    _bindPlayer();
+    try {
+      await previous.stop();
+      await previous.dispose();
+    } catch (_) {}
+  }
+
+  bool _sameIds(List<String> left, List<String> right) {
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] != right[i]) return false;
+    }
+    return true;
   }
 
   @override
