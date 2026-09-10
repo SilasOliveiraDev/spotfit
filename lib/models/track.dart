@@ -31,7 +31,7 @@ class Track {
       id: map['id'] as String,
       title: map['title'] as String,
       artist: map['artist'] as String,
-      audioUrl: map['audio_url'] as String,
+      audioUrl: (map['audio_url'] ?? map['audioUrl']) as String,
       durationMs: (map['duration_ms'] as num?)?.toInt() ?? 0,
       coverUrl: map['cover_url'] as String?,
       bpm: (map['bpm'] as num?)?.toInt(),
